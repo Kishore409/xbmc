@@ -10,7 +10,8 @@
 #pragma once
 
 #include "powermanagement/IPowerSyscall.h"
-#include "DBusUtil.h"
+
+#include <sdbus-c++/sdbus-c++.h>
 
 class CLogindUPowerSyscall : public CAbstractPowerSyscall
 {
@@ -30,7 +31,7 @@ public:
   // we don't require UPower because everything except the battery level works fine without it
   static bool HasLogind();
 private:
-  CDBusConnection m_connection;
+  std::unique_ptr<sdbus::IObjectProxy> m_proxy;
   bool m_canPowerdown;
   bool m_canSuspend;
   bool m_canHibernate;
@@ -42,11 +43,11 @@ private:
   int m_delayLockShutdownFd = -1; // file descriptor for the logind powerdown delay lock
   void UpdateBatteryLevel();
   void InhibitDelayLockSleep();
-  void InhibitDelayLockShutdown();  
+  void InhibitDelayLockShutdown();
   int InhibitDelayLock(const char *what);
   void ReleaseDelayLockSleep();
   void ReleaseDelayLockShutdown();
   void ReleaseDelayLock(int lockFd, const char *what);
-  static bool LogindSetPowerState(const char *state);
-  static bool LogindCheckCapability(const char *capability);
+  bool LogindSetPowerState(std::string state);
+  bool LogindCheckCapability(std::string capability);
 };

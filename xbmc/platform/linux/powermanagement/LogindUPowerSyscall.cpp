@@ -19,9 +19,12 @@
 // Inhibitor Locks documentation:
 // http://www.freedesktop.org/wiki/Software/Logind/inhibit/
 
-#define LOGIND_DEST  "org.freedesktop.login1"
-#define LOGIND_PATH  "/org/freedesktop/login1"
-#define LOGIND_IFACE "org.freedesktop.login1.Manager"
+namespace
+{
+const std::string LOGIND_DEST{"org.freedesktop.login1"};
+const std::string LOGIND_PATH{"/org/freedesktop/login1"};
+const std::string LOGIND_IFACE{"org.freedesktop.login1.Manager"};
+}
 
 CLogindUPowerSyscall::CLogindUPowerSyscall()
 {
@@ -29,12 +32,24 @@ CLogindUPowerSyscall::CLogindUPowerSyscall()
 
   CLog::Log(LOGINFO, "Selected Logind/UPower as PowerSyscall");
 
-  // Check if we have UPower. If not, we avoid any battery related operations.
-  CDBusMessage message("org.freedesktop.UPower", "/org/freedesktop/UPower", "org.freedesktop.UPower", "EnumerateDevices");
-  m_hasUPower = message.SendSystem() != NULL;
+  bool m_hasUPower;
+  auto proxy = sdbus::createObjectProxy("org.freedesktop.UPower", "/org/freedesktop/UPower");
+
+  {
+    try
+    {
+      proxy->callMethod("EnumerateDevices").onInterface("org.freedesktop.UPower").storeResultsTo(m_hasUPower);
+    }
+    catch(const sdbus::Error& e)
+    {
+      m_hasUPower = false;
+    }
+  }
 
   if (!m_hasUPower)
     CLog::Log(LOGINFO, "LogindUPowerSyscall - UPower not found, battery information will not be available");
+
+  m_proxy = sdbus::createObjectProxy(LOGIND_DEST, LOGIND_PATH);
 
   m_canPowerdown = LogindCheckCapability("CanPowerOff");
   m_canReboot    = LogindCheckCapability("CanReboot");
@@ -47,25 +62,7 @@ CLogindUPowerSyscall::CLogindUPowerSyscall()
   if (m_hasUPower)
     UpdateBatteryLevel();
 
-  if (!m_connection.Connect(DBUS_BUS_SYSTEM, true))
-  {
-    return;
-  }
-
-  CDBusError error;
-  dbus_connection_set_exit_on_disconnect(m_connection, false);
-  dbus_bus_add_match(m_connection, "type='signal',interface='org.freedesktop.login1.Manager',member='PrepareForSleep'", error);
-
-  if (!error && m_hasUPower)
-    dbus_bus_add_match(m_connection, "type='signal',interface='org.freedesktop.UPower',member='DeviceChanged'", error);
-
-  dbus_connection_flush(m_connection);
-
-  if (error)
-  {
-    error.Log("UPowerSyscall: Failed to attach to signal");
-    m_connection.Destroy();
-  }
+  //! @todo: subscribe signals
 }
 
 CLogindUPowerSyscall::~CLogindUPowerSyscall()
@@ -124,28 +121,19 @@ bool CLogindUPowerSyscall::HasLogind()
   return (access("/run/systemd/seats/", F_OK) >= 0);
 }
 
-bool CLogindUPowerSyscall::LogindSetPowerState(const char *state)
+bool CLogindUPowerSyscall::LogindSetPowerState(std::string state)
 {
-  CDBusMessage message(LOGIND_DEST, LOGIND_PATH, LOGIND_IFACE, state);
-  // The user_interaction boolean parameters can be used to control
-  // wether PolicyKit should interactively ask the user for authentication
-  // credentials if it needs to.
-  message.AppendArgument(false);
-  return message.SendSystem() != NULL;
+  m_proxy->callMethod(state).onInterface(LOGIND_IFACE).withArguments(false);
+
+  return true;
 }
 
-bool CLogindUPowerSyscall::LogindCheckCapability(const char *capability)
+bool CLogindUPowerSyscall::LogindCheckCapability(std::string capability)
 {
-  char *arg;
-  CDBusMessage message(LOGIND_DEST, LOGIND_PATH, LOGIND_IFACE, capability);
-  DBusMessage *reply = message.SendSystem();
-  if(reply && dbus_message_get_args(reply, NULL, DBUS_TYPE_STRING, &arg, DBUS_TYPE_INVALID))
-  {
-    // Returns one of "yes", "no" or "challenge". If "challenge" is
-    // returned the operation is available, but only after authorization.
-    return (strcmp(arg, "yes") == 0);
-  }
-  return false;
+  std::string reply;
+  m_proxy->callMethod(capability).onInterface(LOGIND_IFACE).storeResultsTo(reply);
+
+  return (reply == "yes") ? true : false;
 }
 
 int CLogindUPowerSyscall::BatteryLevel()
@@ -155,93 +143,38 @@ int CLogindUPowerSyscall::BatteryLevel()
 
 void CLogindUPowerSyscall::UpdateBatteryLevel()
 {
-  char** source  = NULL;
-  int    length = 0;
-  double batteryLevelSum = 0;
-  int    batteryCount = 0;
+  double batteryLevelSum{0};
+  int batteryCount{0};
 
-  CDBusMessage message("org.freedesktop.UPower", "/org/freedesktop/UPower", "org.freedesktop.UPower", "EnumerateDevices");
-  DBusMessage *reply = message.SendSystem();
+  auto proxy = sdbus::createObjectProxy("org.freedesktop.UPower", "/org/freedesktop/UPower");
 
-  if (!reply)
-    return;
+  std::vector<sdbus::ObjectPath> reply;
+  proxy->callMethod("EnumerateDevices").onInterface("org.freedesktop.UPower").storeResultsTo(reply);
 
-  if (!dbus_message_get_args(reply, NULL, DBUS_TYPE_ARRAY, DBUS_TYPE_OBJECT_PATH, &source, &length, DBUS_TYPE_INVALID))
+  for (auto const &i : reply)
   {
-    CLog::Log(LOGWARNING, "LogindUPowerSyscall: failed to enumerate devices");
-    return;
-  }
+    auto device = sdbus::createObjectProxy("org.freedesktop.UPower", i);
+    auto rechargable = device->getProperty("IsRechargeable").onInterface("org.freedesktop.UPower.Device");
+    auto percentage = device->getProperty("Percentage").onInterface("org.freedesktop.UPower.Device");
 
-  for (int i = 0; i < length; i++)
-  {
-    CVariant properties = CDBusUtil::GetAll("org.freedesktop.UPower", source[i], "org.freedesktop.UPower.Device");
-    bool isRechargeable = properties["IsRechargeable"].asBoolean();
-
-    if (isRechargeable)
+    if (rechargable)
     {
       batteryCount++;
-      batteryLevelSum += properties["Percentage"].asDouble();
+      batteryLevelSum += percentage.get<double>();
     }
   }
 
-  dbus_free_string_array(source);
-
   if (batteryCount > 0)
   {
-    m_batteryLevel = (int)(batteryLevelSum / (double)batteryCount);
-    m_lowBattery = CDBusUtil::GetVariant("org.freedesktop.UPower", "/org/freedesktop/UPower", "org.freedesktop.UPower", "OnLowBattery").asBoolean();
+    m_batteryLevel = static_cast<int>(batteryLevelSum / batteryCount);
   }
 }
 
 bool CLogindUPowerSyscall::PumpPowerEvents(IPowerEventsCallback *callback)
 {
-  bool result = false;
-  bool releaseLockSleep = false;
+  //! @todo: implement signals
 
-  if (m_connection)
-  {
-    dbus_connection_read_write(m_connection, 0);
-    DBusMessagePtr msg(dbus_connection_pop_message(m_connection));
-
-    if (msg)
-    {
-      if (dbus_message_is_signal(msg.get(), "org.freedesktop.login1.Manager", "PrepareForSleep"))
-      {
-        dbus_bool_t arg;
-        // the boolean argument defines whether we are going to sleep (true) or just woke up (false)
-        dbus_message_get_args(msg.get(), NULL, DBUS_TYPE_BOOLEAN, &arg, DBUS_TYPE_INVALID);
-        CLog::Log(LOGDEBUG, "LogindUPowerSyscall: Received PrepareForSleep with arg %i", (int)arg);
-        if (arg)
-        {
-          callback->OnSleep();
-          releaseLockSleep = true;
-        }
-        else
-        {
-          callback->OnWake();
-          InhibitDelayLockSleep();
-        }
-
-        result = true;
-      }
-      else if (dbus_message_is_signal(msg.get(), "org.freedesktop.UPower", "DeviceChanged"))
-      {
-        bool lowBattery = m_lowBattery;
-        UpdateBatteryLevel();
-        if (m_lowBattery && !lowBattery)
-          callback->OnLowBattery();
-
-        result = true;
-      }
-      else
-        CLog::Log(LOGDEBUG, "LogindUPowerSyscall - Received unknown signal %s", dbus_message_get_member(msg.get()));
-    }
-  }
-
-  if (releaseLockSleep)
-    ReleaseDelayLockSleep();
-
-  return result;
+  return true;
 }
 
 void CLogindUPowerSyscall::InhibitDelayLockSleep()
@@ -256,34 +189,10 @@ void CLogindUPowerSyscall::InhibitDelayLockShutdown()
 
 int CLogindUPowerSyscall::InhibitDelayLock(const char *what)
 {
-#ifdef DBUS_TYPE_UNIX_FD
-  CDBusMessage message("org.freedesktop.login1", "/org/freedesktop/login1", "org.freedesktop.login1.Manager", "Inhibit");
-  message.AppendArgument(what); // what to inhibit
-  message.AppendArgument("XBMC"); // who
-  message.AppendArgument(""); // reason
-  message.AppendArgument("delay"); // mode
+  int fd{-1};
+  m_proxy->callMethod("Inhibit").onInterface("org.freedesktop.login1.Manager").withArguments(what, "Kodi", "", "delay").storeResultsTo(fd);
 
-  DBusMessage *reply = message.SendSystem();
-
-  if (!reply)
-  {
-    CLog::Log(LOGWARNING, "LogindUPowerSyscall - failed to inhibit %s delay lock", what);
-    return -1;
-  }
-
-  int delayLockFd;
-  if (!dbus_message_get_args(reply, NULL, DBUS_TYPE_UNIX_FD, &delayLockFd, DBUS_TYPE_INVALID))
-  {
-    CLog::Log(LOGWARNING, "LogindUPowerSyscall - failed to get inhibit file descriptor");
-    return -1;
-  }
-
-  CLog::Log(LOGDEBUG, "LogindUPowerSyscall - inhibit lock taken, fd %i", delayLockFd);
-  return delayLockFd;
-#else
-  CLog::Log(LOGWARNING, "LogindUPowerSyscall - inhibit lock support not compiled in");
-  return -1;
-#endif
+  return fd;
 }
 
 void CLogindUPowerSyscall::ReleaseDelayLockSleep()
