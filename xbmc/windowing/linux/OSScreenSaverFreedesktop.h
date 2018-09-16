@@ -12,6 +12,8 @@
 
 #include "../OSScreenSaver.h"
 
+#include <sdbus-c++/sdbus-c++.h>
+
 namespace KODI
 {
 namespace WINDOWING
@@ -24,11 +26,13 @@ namespace LINUX
 class COSScreenSaverFreedesktop : public IOSScreenSaver
 {
 public:
+  COSScreenSaverFreedesktop();
   static bool IsAvailable();
   void Inhibit() override;
   void Uninhibit() override;
 
 private:
+  std::unique_ptr<sdbus::IObjectProxy> m_proxy;
   bool m_inhibited{false};
   std::uint32_t m_cookie;
 };

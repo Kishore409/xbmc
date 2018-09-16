@@ -1,7 +1,7 @@
 set(SOURCES "")
 set(HEADERS "")
 
-if(DBUS_FOUND)
+if(SDBUSPP_FOUND)
   list(APPEND SOURCES OSScreenSaverFreedesktop.cpp)
   list(APPEND HEADERS OSScreenSaverFreedesktop.h)
 endif()
