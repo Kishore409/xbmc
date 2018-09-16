@@ -25,12 +25,12 @@ if(NOT EXISTS "${APP_INCLUDE_DIR}/")
 endif()
 
 # make sure C++11 is always set
-if(NOT WIN32)
-  string(REGEX MATCH "-std=(gnu|c)\\+\\+11" cxx11flag "${CMAKE_CXX_FLAGS}")
-  if(NOT cxx11flag)
-    set(CXX11_SWITCH "-std=c++11")
-  endif()
-endif()
+# if(NOT WIN32)
+#   string(REGEX MATCH "-std=(gnu|c)\\+\\+11" cxx11flag "${CMAKE_CXX_FLAGS}")
+#   if(NOT cxx11flag)
+#     set(CXX11_SWITCH "-std=c++11")
+#   endif()
+# endif()
 
 # generate the proper KodiConfig.cmake file
 configure_file(${CORE_SOURCE_DIR}/cmake/KodiConfig.cmake.in ${APP_LIB_DIR}/KodiConfig.cmake @ONLY)
