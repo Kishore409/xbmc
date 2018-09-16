@@ -156,6 +156,7 @@ set(optional_deps Alsa
                   MicroHttpd
                   PulseAudio
                   Python
+                  SDBuspp
                   SmbClient
                   Sndio
                   UDEV
