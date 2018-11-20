@@ -67,23 +67,21 @@ std::shared_ptr<CCPUInfo> CCPUInfo::GetCPUInfo()
 
 CCPUInfoLinux::CCPUInfoLinux()
 {
-  // new socs use the sysfs soc interface to describe the hardware
-  if (SysfsUtils::Has("/sys/bus/soc/devices/soc0"))
-  {
-    std::string machine;
-    std::string family;
-    std::string socId;
-    if (SysfsUtils::Has("/sys/bus/soc/devices/soc0/machine"))
-      SysfsUtils::GetString("/sys/bus/soc/devices/soc0/machine", machine);
-    if (SysfsUtils::Has("/sys/bus/soc/devices/soc0/family"))
-      SysfsUtils::GetString("/sys/bus/soc/devices/soc0/family", family);
-    if (SysfsUtils::Has("/sys/bus/soc/devices/soc0/soc_id"))
-      SysfsUtils::GetString("/sys/bus/soc/devices/soc0/soc_id", socId);
-    if (m_cpuHardware.empty() && !machine.empty())
-      m_cpuHardware = machine;
-    if (!family.empty() && !socId.empty())
-      m_cpuSoC = family + " " + socId;
-  }
+  CSysfs path;
+
+  path = "/sys/bus/soc/devices/soc0/machine";
+  auto machine = path.Get<std::string>();
+
+  path = "/sys/bus/soc/devices/soc0/family";
+  auto family = path.Get<std::string>();
+
+  path = "/sys/bus/soc/devices/soc0/soc_id";
+  auto soc = path.Get<std::string>();
+
+  if (m_cpuHardware.empty() && !machine.empty())
+    m_cpuHardware = machine;
+  if (!family.empty() && !soc.empty())
+    m_cpuSoC = family + " " + soc;
 
   m_cpuCount = sysconf(_SC_NPROCESSORS_ONLN);
 
@@ -252,34 +250,24 @@ int CCPUInfoLinux::GetUsedPercentage()
 
 float CCPUInfoLinux::GetCPUFrequency()
 {
-  int value{-1};
-  if (SysfsUtils::Has("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq"))
-    SysfsUtils::GetInt("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq", value);
+  CSysfs path("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq");
+  auto value = path.Get<int>();
 
-  value /= 1000.0;
+  if (value > 0)
+    value /= 1000.0;
 
   return value;
 }
 
 bool CCPUInfoLinux::GetTemperature(CTemperature& temperature)
 {
-  if (!SysfsUtils::Has("/sys/class/hwmon/hwmon0/temp1_input"))
+  CSysfs path("/sys/class/hwmon/hwmon0/temp1_input");
+  auto value = path.Get<int>() / 1000.0;
+
+  if (value < 0)
     return CCPUInfoPosix::GetTemperature(temperature);
 
-  int value{-1};
-  char scale{'c'};
-
-  SysfsUtils::GetInt("/sys/class/hwmon/hwmon0/temp1_input", value);
-  value = value / 1000.0;
-  scale = 'c';
-
-  if (scale == 'C' || scale == 'c')
-    temperature = CTemperature::CreateFromCelsius(value);
-  else if (scale == 'F' || scale == 'f')
-    temperature = CTemperature::CreateFromFahrenheit(value);
-  else
-    return false;
-
+  temperature = CTemperature::CreateFromCelsius(value);
   temperature.SetValid(true);
 
   return true;

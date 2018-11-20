@@ -7,114 +7,85 @@
  */
 
 #include "SysfsUtils.h"
+
 #include "utils/log.h"
-#include "utils/StringUtils.h"
+
+#include <fstream>
 
 #include <unistd.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <fcntl.h>
-#include <string.h>
 
-#ifdef TARGET_WINDOWS_STORE
-#include <io.h>
-#endif
-
-int SysfsUtils::SetString(const std::string& path, const std::string& valstr)
+namespace
 {
-  int fd = open(path.c_str(), O_RDWR, 0644);
-  int ret = 0;
-  if (fd >= 0)
-  {
-    if (write(fd, valstr.c_str(), valstr.size()) < 0)
-      ret = -1;
-    close(fd);
-  }
-  if (ret)
-    CLog::Log(LOGERROR, "%s: error writing %s",__FUNCTION__, path.c_str());
-
-  return ret;
+const int PAGESIZE = getpagesize();
 }
 
-int SysfsUtils::GetString(const std::string& path, std::string& valstr)
+template<>
+std::string CSysfs::Get()
 {
-  int len;
-  char buf[256] = {0};
+  std::ifstream file(m_path);
 
-  int fd = open(path.c_str(), O_RDONLY);
-  if (fd >= 0)
+  if (!file.is_open())
+    return "";
+
+  std::string value;
+  file >> value;
+
+  if ((file.rdstate() & std::ifstream::badbit) != 0)
   {
-    valstr.clear();
-    while ((len = read(fd, buf, 256)) > 0)
-      valstr.append(buf, len);
-    close(fd);
-
-    StringUtils::Trim(valstr);
-
-    return 0;
+    CLog::Log(LOGERROR, "CSysfs::{} error reading from '{}'", __FUNCTION__, m_path);
+    return "";
   }
 
-  CLog::Log(LOGERROR, "%s: error reading %s",__FUNCTION__, path.c_str());
-  valstr = "fail";
-  return -1;
+  return value;
 }
 
-int SysfsUtils::SetInt(const std::string& path, const int val)
+template<>
+int CSysfs::Get()
 {
-  int fd = open(path.c_str(), O_RDWR, 0644);
-  int ret = 0;
-  if (fd >= 0)
+  try
   {
-    char bcmd[16];
-    sprintf(bcmd, "%d", val);
-    if (write(fd, bcmd, strlen(bcmd)) < 0)
-      ret = -1;
-    close(fd);
+    return std::stoi(Get<std::string>());
   }
-  if (ret)
-    CLog::Log(LOGERROR, "%s: error writing %s",__FUNCTION__, path.c_str());
-
-  return ret;
-}
-
-int SysfsUtils::GetInt(const std::string& path, int& val)
-{
-  int fd = open(path.c_str(), O_RDONLY);
-  int ret = 0;
-  if (fd >= 0)
+  catch (std::invalid_argument& error)
   {
-    char bcmd[16];
-    if (read(fd, bcmd, sizeof(bcmd)) < 0)
-      ret = -1;
-    else
-      val = strtol(bcmd, NULL, 16);
-
-    close(fd);
+    return -1;
   }
-  if (ret)
-    CLog::Log(LOGERROR, "%s: error reading %s",__FUNCTION__, path.c_str());
-
-  return ret;
 }
 
-bool SysfsUtils::Has(const std::string &path)
+template<>
+bool CSysfs::Set(const std::string& value)
 {
-  int fd = open(path.c_str(), O_RDONLY);
-  if (fd >= 0)
-  {
-    close(fd);
+  if (Get<std::string>() == value)
     return true;
+
+  if (static_cast<int>(value.size()) > PAGESIZE)
+  {
+    CLog::Log(LOGERROR, "CSysfs::{} value '{}' is larger then the system pagesize: {} vs {}",
+              __FUNCTION__, value, value.size(), PAGESIZE);
+    return false;
   }
-  return false;
+
+  std::ofstream file(m_path);
+
+  if (!file.is_open())
+  {
+    CLog::Log(LOGERROR, "CSysfs::{} {} is not open for writing", __FUNCTION__, m_path);
+    return false;
+  }
+
+  file << value;
+
+  if ((file.rdstate() & std::ifstream::badbit) != 0)
+  {
+    CLog::Log(LOGERROR, "CSysfs::{} error writing to '{}'", __FUNCTION__, m_path);
+    return false;
+  }
+
+  return true;
 }
 
-bool SysfsUtils::HasRW(const std::string &path)
+template<>
+bool CSysfs::Set(const int& value)
 {
-  int fd = open(path.c_str(), O_RDWR);
-  if (fd >= 0)
-  {
-    close(fd);
-    return true;
-  }
-  return false;
+  return Set(std::to_string(value));
 }
