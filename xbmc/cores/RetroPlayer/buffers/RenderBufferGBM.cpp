@@ -8,8 +8,8 @@
 
 #include "RenderBufferGBM.h"
 #include "ServiceBroker.h"
+#include "utils/BufferObject.h"
 #include "utils/EGLImage.h"
-#include "utils/GBMBufferObject.h"
 #include "windowing/gbm/WinSystemGbmEGLContext.h"
 
 using namespace KODI::WINDOWING::GBM;
@@ -21,7 +21,7 @@ CRenderBufferGBM::CRenderBufferGBM(CRenderContext &context,
   m_context(context),
   m_fourcc(fourcc),
   m_egl(new CEGLImage(static_cast<CWinSystemGbmEGLContext*>(CServiceBroker::GetWinSystem())->GetEGLDisplay())),
-  m_bo(new CGBMBufferObject(fourcc))
+  m_bo(CBufferObject::GetBufferObject(fourcc))
 {
 }
 

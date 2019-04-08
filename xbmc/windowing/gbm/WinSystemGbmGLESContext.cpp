@@ -19,6 +19,8 @@
 
 #include "OptionalsReg.h"
 #include "platform/linux/XTimeUtils.h"
+#include "utils/BufferObjectFactory.h"
+#include "utils/GBMBufferObject.h"
 #include "utils/log.h"
 #include "WinSystemGbmGLESContext.h"
 
@@ -65,6 +67,11 @@ bool CWinSystemGbmGLESContext::InitWindowSystem()
   CRendererDRMPRIMEGLES::Register();
   CRendererDRMPRIME::Register();
   CDVDVideoCodecDRMPRIME::Register();
+
+  CBufferObjectFactory::ClearBufferObjects();
+#if defined(HAS_GBM_BO_MAP)
+  CGBMBufferObject::Register();
+#endif
 
   return true;
 }

@@ -1,0 +1,32 @@
+/*
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
+ *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
+ */
+
+#include "BufferObject.h"
+#include "BufferObjectFactory.h"
+
+CBufferObject* CBufferObject::GetBufferObject(int format)
+{
+  return CBufferObjectFactory::CreateBufferObject(format);;
+}
+
+int CBufferObject::GetFd()
+{
+  return m_fd;
+}
+
+int CBufferObject::GetStride()
+{
+  return m_stride;
+}
+
+uint64_t CBufferObject::GetModifier()
+{
+  return 0; // linear
+}
+
+
