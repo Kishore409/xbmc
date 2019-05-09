@@ -46,6 +46,10 @@ set(SOURCES TestAlarmClock.cpp
 
 set(HEADERS TestGlobalsHandlingPattern1.h)
 
+if(CORE_SYSTEM_NAME STREQUAL linux)
+  list(APPEND SOURCES TestSysfsUtils.cpp)
+endif()
+
 if(NOT CORE_SYSTEM_NAME STREQUAL windows AND NOT CORE_SYSTEM_NAME STREQUAL windowsstore)
   list(APPEND SOURCES TestCryptThreading.cpp)
 endif()
