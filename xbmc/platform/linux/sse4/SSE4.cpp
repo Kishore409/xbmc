@@ -6,6 +6,8 @@
  *  See LICENSES/README.md for more information.
  */
 
+#include "SSE4.h"
+
 #include "smmintrin.h"
 
 #define CACHED_BUFFER_SIZE 4096
@@ -18,7 +20,7 @@ extern "C"
  * COPIES VIDEO FRAMES FROM USWC MEMORY TO WB SYSTEM MEMORY VIA CACHED BUFFER
  * ASSUMES PITCH IS A MULTIPLE OF 64B CACHE LINE SIZE, WIDTH MAY NOT BE
  */
-void copy_frame( void * pSrc, void * pDest, void * pCacheBlock,
+void SSE4::copy_frame( void * pSrc, void * pDest, void * pCacheBlock,
     unsigned int width, unsigned int height, unsigned int pitch )
 {
   __m128i         x0, x1, x2, x3;

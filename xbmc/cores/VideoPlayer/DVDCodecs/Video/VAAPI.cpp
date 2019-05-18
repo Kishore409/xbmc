@@ -24,6 +24,7 @@
 #include <va/va_drm.h>
 #include <va/va_drmcommon.h>
 #include <drm_fourcc.h>
+#include "platform/linux/sse4/SSE4.h"
 #include "platform/linux/XTimeUtils.h"
 #include "platform/linux/XMemUtils.h"
 
@@ -2818,7 +2819,6 @@ CFFmpegPostproc::~CFFmpegPostproc()
 {
   Close();
   _aligned_free(m_cache);
-  m_dllSSE4.Unload();
   av_frame_free(&m_pFilterFrameIn);
   av_frame_free(&m_pFilterFrameOut);
 }
@@ -2855,12 +2855,6 @@ bool CFFmpegPostproc::PreInit(CVaapiConfig &config, SDiMethods *methods)
   }
   if (image.image_id != VA_INVALID_ID)
     CheckSuccess(vaDestroyImage(config.dpy, image.image_id), "vaDestroyImage");
-
-  if (use_filter && !m_dllSSE4.Load())
-  {
-    CLog::Log(LOGERROR,"VAAPI::SupportsFilter failed loading sse4 lib");
-    use_filter = false;
-  }
 
   if (use_filter)
   {
@@ -3015,11 +3009,11 @@ bool CFFmpegPostproc::AddPicture(CVaapiDecodedPicture &inPic)
   uint8_t *src, *dst;
   src = buf + image.offsets[0];
   dst = m_pFilterFrameIn->data[0];
-  m_dllSSE4.copy_frame(src, dst, m_cache, m_config.vidWidth, m_config.vidHeight, image.pitches[0]);
+  SSE4::copy_frame(src, dst, m_cache, m_config.vidWidth, m_config.vidHeight, image.pitches[0]);
 
   src = buf + image.offsets[1];
   dst = m_pFilterFrameIn->data[1];
-  m_dllSSE4.copy_frame(src, dst, m_cache, image.width, image.height/2, image.pitches[1]);
+  SSE4::copy_frame(src, dst, m_cache, image.width, image.height/2, image.pitches[1]);
 
   m_pFilterFrameIn->linesize[0] = image.pitches[0];
   m_pFilterFrameIn->linesize[1] = image.pitches[1];
