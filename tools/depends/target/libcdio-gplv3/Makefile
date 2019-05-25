@@ -7,10 +7,9 @@ VERSION=0.94
 SOURCE=$(LIBNAME)-$(VERSION)
 ARCHIVE=$(SOURCE).tar.gz
 # configuration settings
-CONFIGURE=cp -f $(CONFIG_SUB) $(CONFIG_GUESS) .; \
-          ./configure --prefix=$(PREFIX)  --with-cd-drive=no --with-cd-info=no \
+CONFIGURE=./configure --prefix=$(PREFIX)  --with-cd-drive=no --with-cd-info=no \
           --with-cdda-player=no --with-cd-read=no --with-iso-info=no --with-iso-read=no --disable-example-progs \
-          --disable-cpp-progs --disable-cxx --disable-shared
+          --disable-cpp-progs --enable-cxx --disable-shared
 
 LIBDYLIB=$(PLATFORM)/lib/driver/.libs/$(LIBNAME).a
 
