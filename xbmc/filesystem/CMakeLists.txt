@@ -51,7 +51,6 @@ set(SOURCES AddonsDirectory.cpp
             SpecialProtocolDirectory.cpp
             SpecialProtocolFile.cpp
             StackDirectory.cpp
-            udf25.cpp
             UDFDirectory.cpp
             UDFFile.cpp
             VideoDatabaseDirectory.cpp
@@ -120,7 +119,6 @@ set(HEADERS AddonsDirectory.h
             SpecialProtocolDirectory.h
             SpecialProtocolFile.h
             StackDirectory.h
-            udf25.h
             UDFDirectory.h
             UDFFile.h
             VideoDatabaseDirectory.h
