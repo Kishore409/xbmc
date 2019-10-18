@@ -21,7 +21,7 @@ DEPENDS = \
 FFMPEG_DEPENDS = gnutls
 
 ifeq ($(ENABLE_GPLV3),yes)
-  DEPENDS+=samba-gplv3 libcdio-gplv3
+  DEPENDS+=samba-gplv3 libcdio
 else
   DEPENDS+=samba
 endif
@@ -92,7 +92,7 @@ curl: openssl nghttp2
 libass: fontconfig fribidi libpng freetype2 expat $(ICONV)
 libmicrohttpd: gnutls libgcrypt libgpg-error
 python3: expat gettext libxml2 sqlite3 openssl libffi
-libcdio-gplv3: $(ICONV)
+libcdio: $(ICONV)
 libplist: $(ZLIB)
 libbluray: fontconfig freetype2 $(ICONV) libxml2
 mariadb: openssl $(ICONV) $(ZLIB)

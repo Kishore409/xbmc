@@ -14,7 +14,7 @@
 
 if(ENABLE_INTERNAL_CDIO)
   include(ExternalProject)
-  file(STRINGS ${CMAKE_SOURCE_DIR}/tools/depends/target/libcdio-gplv3/Makefile VERSION)
+  file(STRINGS ${CMAKE_SOURCE_DIR}/tools/depends/target/libcdio/Makefile VERSION)
   string(REGEX REPLACE ".*VERSION=([0-9.]*).*" "\\1" CDIOPP_VERSION "${VERSION}")
 
   # allow user to override the download URL with a local tarball
