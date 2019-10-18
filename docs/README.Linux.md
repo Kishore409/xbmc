@@ -8,14 +8,14 @@ Several distribution **[specific build guides](README.md)** are available.
 ## Table of Contents
 1. **[Document conventions](#1-document-conventions)**
 2. **[Get the source code](#2-get-the-source-code)**
-3. **[Install the required packages](#3-install-the-required-packages)**  
-  3.1. **[Build missing dependencies](#31-build-missing-dependencies)**  
+3. **[Install the required packages](#3-install-the-required-packages)**
+  3.1. **[Build missing dependencies](#31-build-missing-dependencies)**
   3.2. **[Enable internal dependencies](#32-enable-internal-dependencies)**
-4. **[Build Kodi](#4-build-kodi)**  
-  4.1. **[Configure build](#41-configure-build)**  
+4. **[Build Kodi](#4-build-kodi)**
+  4.1. **[Configure build](#41-configure-build)**
   4.2. **[Build](#42-build)**
 5. **[Build binary add-ons](#5-build-binary-add-ons)**
-  5.1. **[In-tree building of binary add-ons](#51-in-tree-building-of-binary-add-ons)**  
+  5.1. **[In-tree building of binary add-ons](#51-in-tree-building-of-binary-add-ons)**
   5.2. **[Out-of-tree building of binary add-ons](#52-out-of-tree-building-of-binary-add-ons)**
 6. **[Run Kodi](#6-run-kodi)**
 7. **[Uninstall Kodi](#7-uninstall-kodi)**
@@ -47,9 +47,9 @@ git clone -b Krypton https://github.com/xbmc/xbmc kodi
 ```
 
 Several different strategies are used to draw your attention to certain pieces of information. In order of how critical the information is, these items are marked as a note, tip, or warning. For example:
- 
-**NOTE:** Linux is user friendly... It's just very particular about who its friends are.  
-**TIP:** Algorithm is what developers call code they do not want to explain.  
+
+**NOTE:** Linux is user friendly... It's just very particular about who its friends are.
+**TIP:** Algorithm is what developers call code they do not want to explain.
 **WARNING:** Developers don't change light bulbs. It's a hardware problem.
 
 **[back to top](#table-of-contents)** | **[back to section top](#1-document-conventions)**
@@ -77,11 +77,16 @@ The following is the list of packages that are used to build Kodi on Debian/Ubun
 * autoconf, automake, autopoint, gettext, autotools-dev, cmake, curl, default-jre | openjdk-6-jre | openjdk-7-jre, gawk, gcc (>= 4.9) | gcc-4.9, g++ (>= 4.9) | g++-4.9, cpp (>= 4.9) | cpp-4.9, flatbuffers, gdc, gperf, libasound2-dev | libasound-dev, libass-dev (>= 0.9.8), libavahi-client-dev, libavahi-common-dev, libbluetooth-dev, libbluray-dev, libbz2-dev, libcdio-dev, libcec4-dev | libcec-dev, libp8-platform-dev, libcrossguid-dev, libcurl4-openssl-dev | libcurl4-gnutls-dev | libcurl-dev, libcwiid-dev, libdbus-1-dev, libegl1-mesa-dev, libenca-dev, libflac-dev, libfontconfig-dev, libfmt3-dev | libfmt-dev, libfreetype6-dev, libfribidi-dev, libfstrcmp-dev, libgcrypt-dev, libgif-dev (>= 5.0.5), libgles2-mesa-dev [armel] | libgl1-mesa-dev | libgl-dev, libglew-dev, libglu1-mesa-dev | libglu-dev, libgnutls-dev | libgnutls28-dev, libgpg-error-dev, libiso9660-dev, libjpeg-dev, liblcms2-dev, liblirc-dev, libltdl-dev, liblzo2-dev, libmicrohttpd-dev, libmysqlclient-dev, libnfs-dev, libogg-dev, libomxil-bellagio-dev [armel], libpcre3-dev, libplist-dev, libpng12-dev | libpng-dev, libpulse-dev, libshairplay-dev, libsmbclient-dev, libsqlite3-dev, libssl-dev, libtag1-dev (>= 1.8) | libtag1x8, libtiff5-dev | libtiff-dev | libtiff4-dev, libtinyxml-dev, libtool, libudev-dev, libva-dev, libvdpau-dev, libvorbis-dev, libxkbcommon-dev, libxmu-dev, libxrandr-dev, libxslt1-dev | libxslt-dev, libxt-dev, waylandpp-dev | netcat, wayland-protocols | wipe, lsb-release, nasm [!amd64], python-dev, python-pil | python-imaging, python-support | python-minimal, rapidjson-dev, swig, unzip, uuid-dev, yasm, zip, zlib1g-dev
 
 ### 3.1. Build missing dependencies
-Some packages may be missing or outdated in older distributions. Notably `crossguid, libfmt, waylandpp, wayland-protocols, etc.` are known to be outdated or missing. Fortunately there is an easy way to build individual dependencies with **[Kodi's unified depends build system](../tools/depends/README.md)**.
+Some packages may be missing or outdated in older distributions. Notably `libcdio, crossguid, libfmt, waylandpp, wayland-protocols, etc.` are known to be outdated or missing. Fortunately there is an easy way to build individual dependencies with **[Kodi's unified depends build system](../tools/depends/README.md)**.
 
 Change to Kodi's source code directory:
 ```
 cd $HOME/kodi
+```
+
+Build and install libcdio:
+```
+sudo make -C tools/depends/target/libcdio PREFIX=/usr/local
 ```
 
 Build and install crossguid:
@@ -111,10 +116,9 @@ sudo make -C tools/depends/target/waylandpp PREFIX=/usr/local
 
 **WARNING:** Building `waylandpp` has some dependencies of its own, namely `scons, libwayland-dev (>= 1.11.0) and libwayland-egl1-mesa`
 
-**TIP:** Complete list of dependencies is available **[here](https://github.com/xbmc/xbmc/tree/master/tools/depends/target)**.
-
+f
 ### 3.2. Enable internal dependencies
-Some dependencies can be configured to build before Kodi. That's the case with `flatbuffers`, `crossguid, libfmt and rapidjson`. To enable the internal build of a dependency, append `-DENABLE_INTERNAL_<DEPENDENCY_NAME>=ON` to the configure command below. For example, configuring an X11 build with internal `fmt` would become `cmake ../kodi -DCMAKE_INSTALL_PREFIX=/usr/local -DENABLE_INTERNAL_FMT=ON` instead of `cmake ../kodi -DCMAKE_INSTALL_PREFIX=/usr/local`.
+Some dependencies can be configured to build before Kodi. That's the case with `flatbuffers, libcdio, crossguid, libfmt and rapidjson`. To enable the internal build of a dependency, append `-DENABLE_INTERNAL_<DEPENDENCY_NAME>=ON` to the configure command below. For example, configuring an X11 build with internal `fmt` would become `cmake ../kodi -DCMAKE_INSTALL_PREFIX=/usr/local -DENABLE_INTERNAL_FMT=ON` instead of `cmake ../kodi -DCMAKE_INSTALL_PREFIX=/usr/local`.
 
 **[back to top](#table-of-contents)** | **[back to section top](#3-installing-the-required-packages)**
 

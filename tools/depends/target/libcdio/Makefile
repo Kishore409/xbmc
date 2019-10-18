@@ -1,5 +1,5 @@
-include ../../Makefile.include
-DEPS= ../../Makefile.include Makefile osx.patch osx2.patch
+-include ../../Makefile.include
+DEPS= Makefile osx.patch osx2.patch
 
 # lib name, version
 LIBNAME=libcdio
@@ -10,6 +10,22 @@ ARCHIVE=$(SOURCE).tar.gz
 CONFIGURE=./configure --prefix=$(PREFIX)  --with-cd-drive=no --with-cd-info=no \
           --with-cdda-player=no --with-cd-read=no --with-iso-info=no --with-iso-read=no --disable-example-progs \
           --disable-cpp-progs --enable-cxx --disable-shared
+
+ifeq ($(CROSS_COMPILING), yes)
+  DEPS += ../../Makefile.include
+  CXXFLAGS += -std=c++11
+else
+  CXXFLAGS += -std=c++11
+  ROOT_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
+
+  ifeq ($(PLATFORM),)
+    PLATFORM = native
+    TARBALLS_LOCATION = $(ROOT_DIR)
+    BASE_URL := http://mirrors.kodi.tv/build-deps/sources
+    RETRIEVE_TOOL := curl -Ls --create-dirs -f -O
+    ARCHIVE_TOOL := tar --strip-components=1 -xf
+  endif
+endif
 
 LIBDYLIB=$(PLATFORM)/lib/driver/.libs/$(LIBNAME).a
 
@@ -23,16 +39,13 @@ $(PLATFORM): $(TARBALLS_LOCATION)/$(ARCHIVE) $(DEPS)
 	cd $(PLATFORM); $(ARCHIVE_TOOL) $(ARCHIVE_TOOL_FLAGS) $(TARBALLS_LOCATION)/$(ARCHIVE)
 	cd $(PLATFORM); patch -p1 -i ../osx.patch
 	cd $(PLATFORM); patch -p1 -i ../osx2.patch
-	cd $(PLATFORM); $(AUTORECONF) -vif
 	cd $(PLATFORM); $(CONFIGURE)
 
 $(LIBDYLIB): $(PLATFORM)
 	$(MAKE) -C $(PLATFORM)/lib
 
 .installed-$(PLATFORM): $(LIBDYLIB)
-	$(MAKE) -C $(PLATFORM)/lib install
-	$(MAKE) -C $(PLATFORM)/include install
-	$(MAKE) -C $(PLATFORM) install-data-am
+	$(MAKE) -C $(PLATFORM) install
 	cp $(PLATFORM)/include/cdio/cdtext.h $(PREFIX)/include/cdio/
 	touch $@
 
