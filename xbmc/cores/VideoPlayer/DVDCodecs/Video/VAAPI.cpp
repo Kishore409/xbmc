@@ -2460,7 +2460,7 @@ bool CVppPostproc::PreInit(CVaapiConfig &config, SDiMethods *methods)
   if (m_config.profile == VAProfileHEVCMain10)
   {
     format = VA_RT_FORMAT_YUV420_10BPP;
-    attrib->value.value.i = VA_FOURCC_P010;
+    attrib->value.value.i = VA_FOURCC_X2R10G10B10;
   }
   int nb_surfaces = NUM_RENDER_PICS;
   if (!CheckSuccess(
@@ -2491,8 +2491,13 @@ bool CVppPostproc::PreInit(CVaapiConfig &config, SDiMethods *methods)
 
   VAProcFilterType filters[VAProcFilterCount];
   unsigned int numFilters = VAProcFilterCount;
+#if 0
   VAProcFilterCapDeinterlacing deinterlacingCaps[VAProcDeinterlacingCount];
   unsigned int numDeinterlacingCaps = VAProcDeinterlacingCount;
+#endif
+  VAProcFilterCapHighDynamicRange hdrtm_caps[VAProcHighDynamicRangeMetadataTypeCount];
+  uint32_t num_hdrtm_caps = VAProcHighDynamicRangeMetadataTypeCount;
+  memset(&hdrtm_caps, 0, sizeof(VAProcFilterCapHighDynamicRange)*num_hdrtm_caps);
 
   if (!CheckSuccess(vaQueryVideoProcFilters(m_config.dpy, m_contextId, filters, &numFilters),
       "vaQueryVideoProcFilters"))
@@ -2502,6 +2507,29 @@ bool CVppPostproc::PreInit(CVaapiConfig &config, SDiMethods *methods)
     return false;
   }
 
+  unsigned int i;
+  for (i = 0; i < numFilters; i++) {
+		if (filters[i] == VAProcFilterHighDynamicRangeToneMapping)
+			break;
+  }
+
+  if (i == numFilters) {
+		CLog::Log(LOGDEBUG, "VPP filter type VAProcFilterHighDynamicRangeToneMapping is not supported by driver");
+		return false;
+  }
+
+  if (!CheckSuccess(vaQueryVideoProcFilterCaps(m_config.dpy, m_contextId, VAProcFilterHighDynamicRangeToneMapping,
+					(void *)hdrtm_caps, &num_hdrtm_caps), "vaQueryVideoProcFilterCaps"))
+  {
+    CLog::Log(LOGDEBUG, LOGVIDEO, "CVppPostproc::PreInit  - VPP init failed in vaQueryVideoProcFilterCaps");
+    return false;
+  }
+  for (i = 0; i < num_hdrtm_caps; ++i)    {
+    CLog::Log(LOGDEBUG, "vaQueryVideoProcFilterCaps hdrtm_caps[%d]: metadata type %d, flag %d", i,
+												hdrtm_caps[i].metadata_type, hdrtm_caps[i].caps_flag);
+  }
+
+#if 0
   if (!CheckSuccess(vaQueryVideoProcFilterCaps(m_config.dpy, m_contextId, VAProcFilterDeinterlacing,
       deinterlacingCaps,
       &numDeinterlacingCaps), "vaQueryVideoProcFilterCaps"))
@@ -2535,6 +2563,7 @@ bool CVppPostproc::PreInit(CVaapiConfig &config, SDiMethods *methods)
       }
     }
   }
+#endif
   return true;
 }
 
@@ -2591,10 +2620,32 @@ bool CVppPostproc::UpdateDeintMethod(EINTERLACEMETHOD method)
     return false;
   }
 
+#if 0
   VAProcFilterParameterBufferDeinterlacing filterparams;
   filterparams.type = VAProcFilterDeinterlacing;
   filterparams.algorithm = vppMethod;
   filterparams.flags = 0;
+#endif
+  VAHdrMetaDataHDR10 in_hdr10_metadata = {};
+  in_hdr10_metadata.max_display_mastering_luminance = 1000;
+  in_hdr10_metadata.min_display_mastering_luminance = 500;
+  in_hdr10_metadata.white_point_x = 15635;
+  in_hdr10_metadata.white_point_y = 16450;
+  in_hdr10_metadata.max_content_light_level = 4000;
+  in_hdr10_metadata.max_pic_average_light_level = 1000;
+  in_hdr10_metadata.display_primaries_x[0] = 8500;
+  in_hdr10_metadata.display_primaries_y[0] = 39850;
+  in_hdr10_metadata.display_primaries_x[1] = 35400;
+  in_hdr10_metadata.display_primaries_y[1] = 14600;
+  in_hdr10_metadata.display_primaries_x[2] = 6550;
+  in_hdr10_metadata.display_primaries_y[2] = 2300;
+
+  VAProcFilterParameterBufferHDRToneMapping filterparams;
+  filterparams.type = VAProcFilterHighDynamicRangeToneMapping;
+  filterparams.data.metadata_type = VAProcHighDynamicRangeMetadataHDR10;
+  filterparams.data.metadata= &in_hdr10_metadata;
+  filterparams.data.metadata_size = sizeof(VAHdrMetaDataHDR10);
+
 
   if (!CheckSuccess(vaCreateBuffer(m_config.dpy, m_contextId, VAProcFilterParameterBufferType,
       sizeof(filterparams), 1,
@@ -2709,7 +2760,8 @@ bool CVppPostproc::Filter(CVaapiProcessedPicture &outPic)
   }
 
   // vpp deinterlacing
-  VAProcFilterParameterBufferDeinterlacing *filterParams;
+  //VAProcFilterParameterBufferDeinterlacing *filterParams;
+  VAProcFilterParameterBufferHDRToneMapping *filterParams;
   VABufferID pipelineBuf;
   VAProcPipelineParameterBuffer *pipelineParams;
   VARectangle inputRegion;
@@ -2738,9 +2790,12 @@ bool CVppPostproc::Filter(CVaapiProcessedPicture &outPic)
   inputRegion.height = outputRegion.height = m_config.surfaceHeight;
 
   pipelineParams->output_region = &outputRegion;
+  pipelineParams->output_color_standard = VAProcColorStandardBT2020;
   pipelineParams->surface_region = &inputRegion;
-  pipelineParams->output_background_color = 0xff000000;
+  //pipelineParams->output_background_color = 0xff000000;
+  pipelineParams->surface_color_standard = VAProcColorStandardBT2020;
   pipelineParams->filter_flags = 0;
+  pipelineParams->output_hdr_metadata = NULL;
 
   VASurfaceID forwardRefs[32];
   VASurfaceID backwardRefs[32];
@@ -2777,7 +2832,7 @@ bool CVppPostproc::Filter(CVaapiProcessedPicture &outPic)
     {
       return false;
     }
-    filterParams->flags = flags;
+   // filterParams->flags = flags;
     if (!CheckSuccess(vaUnmapBuffer(m_config.dpy, m_filter), "vaUnmapBuffer"))
     {
       return false;
