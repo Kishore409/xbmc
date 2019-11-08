@@ -2596,6 +2596,26 @@ bool CVppPostproc::UpdateDeintMethod(EINTERLACEMETHOD method)
   filterparams.algorithm = vppMethod;
   filterparams.flags = 0;
 
+  VAHdrMetaDataHDR10 in_hdr10_metadata = {};
+  in_hdr10_metadata.max_display_mastering_luminance = 1000;
+  in_hdr10_metadata.min_display_mastering_luminance = 500;
+  in_hdr10_metadata.white_point_x = 15635;
+  in_hdr10_metadata.white_point_y = 16450;
+  in_hdr10_metadata.max_content_light_level = 4000;
+  in_hdr10_metadata.max_pic_average_light_level = 1000;
+  in_hdr10_metadata.display_primaries_x[0] = 8500;
+  in_hdr10_metadata.display_primaries_y[0] = 39850;
+  in_hdr10_metadata.display_primaries_x[1] = 35400;
+  in_hdr10_metadata.display_primaries_y[1] = 14600;
+  in_hdr10_metadata.display_primaries_x[2] = 6550;
+  in_hdr10_metadata.display_primaries_y[2] = 2300;
+
+  VAProcFilterParameterBufferHDRToneMapping filterparams;
+  filterparams.type = VAProcFilterHighDynamicRangeToneMapping;
+  filterparams.data.metadata_type = VAProcHighDynamicRangeMetadataHDR10;
+  filterparams.data.metadata= &in_hdr10_metadata;
+  filterparams.data.metadata_size = sizeof(VAHdrMetaDataHDR10);
+
   if (!CheckSuccess(vaCreateBuffer(m_config.dpy, m_contextId, VAProcFilterParameterBufferType,
       sizeof(filterparams), 1,
       &filterparams, &m_filter), "vaCreateBuffer"))
